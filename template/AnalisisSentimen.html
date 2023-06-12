@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analisis Sentimen</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body>
+    <h1>Analisis Sentimen</h1>
+    <textarea id="inputText" rows="4" cols="50" placeholder="Masukkan teks..."></textarea><br><br>
+    <button onclick="submitText()">Analisis</button>
+
+    <h2>Hasil Analisis:</h2>
+    <p id="result"></p>
+
+    <script>
+        function submitText() {
+            var text = document.getElementById("inputText").value;
+            $.ajax({
+                type: 'POST',
+                url: '/classify',
+                data: {text: text},
+                success: function(result) {
+                    document.getElementById("result").innerHTML = result;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
