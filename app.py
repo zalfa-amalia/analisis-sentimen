@@ -9,7 +9,7 @@ import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
 from sklearn.metrics import confusion_matrix, accuracy_score
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='template')
 
 # Load Dataset from Excel file
 dataset = pd.read_excel('data_trainingnew.xlsx')
@@ -145,12 +145,24 @@ print(classification_report(y_test, y_pred))
 
 @app.route('/')
 def index():
-    return render_template('AnalisisSentimen.html')
+    return render_template('index.html')
 
 @app.route('/classify', methods=['POST'])
 def classify():
     text = request.form['text']
     stemmed_text = [stemmer.stem(word) for word in word_tokenize(text.lower())]
+    print(stemmed_text)
     vectorized_text = vectorizer.transform([' '.join(stemmed_text)])
+    print(vectorized_text)
     prediction = nb_classifier.predict(vectorized_text)[0]
-    return render_template('result.html', prediction=prediction)
+    print(prediction)
+    if prediction == 'negatif':
+        result = 'Sentimen: Negatif'
+    elif prediction == 'positif':
+        result = 'Sentimen: Positif'
+    else:
+        result = 'Sentimen: Netral'
+    return render_template('result.html', result=result)
+
+if __name__=="__main__":
+    app.run(debug=True)
