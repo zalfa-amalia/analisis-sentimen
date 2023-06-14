@@ -12,7 +12,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 app = Flask(__name__, template_folder='template')
 
 # Load Dataset from Excel file
-dataset = pd.read_excel('data_trainingnew.xlsx')
+dataset = pd.read_excel('training.xlsx')
 
 # Preprocessing: Case Folding
 dataset['text'] = dataset['text'].str.lower()
@@ -151,11 +151,8 @@ def index():
 def classify():
     text = request.form['text']
     stemmed_text = [stemmer.stem(word) for word in word_tokenize(text.lower())]
-    print(stemmed_text)
     vectorized_text = vectorizer.transform([' '.join(stemmed_text)])
-    print(vectorized_text)
     prediction = nb_classifier.predict(vectorized_text)[0]
-    print(prediction)
     if prediction == 'negatif':
         result = 'Sentimen: Negatif'
     elif prediction == 'positif':
@@ -163,6 +160,7 @@ def classify():
     else:
         result = 'Sentimen: Netral'
     return render_template('result.html', result=result)
+
 
 if __name__=="__main__":
     app.run(debug=True)
