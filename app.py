@@ -6,115 +6,119 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 import nltk
-from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.tokenize import word_tokenize
 from sklearn.metrics import confusion_matrix, accuracy_score
+from nltk.corpus import stopwords
+import mysql.connector
+import re
 
 app = Flask(__name__, template_folder='template')
 
-# Load Dataset from Excel file
-dataset = pd.read_excel('training.xlsx')
+# Koneksi ke database MySQL
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="",
+    database="data_set"
+)
+cursor = conn.cursor()
 
 # Preprocessing: Case Folding
+cursor.execute("SELECT text, sentimen FROM training")
+data = cursor.fetchall()
+dataset = pd.DataFrame(data, columns=['text', 'sentimen'])
 dataset['text'] = dataset['text'].str.lower()
 
-# Preprocessing: Tokenizing
-dataset['text'] = dataset['text'].apply(word_tokenize)
+def cleansing(text):
+    text = text.strip(" ")
+    text = re.sub(r'[?|$|.|!_:")(-+,]', '', text)
+    text = re.sub(r'\d+', '', text)
+    text = re.sub(r"\b[a-zA-Z]\b", "", text)
+    text = re.sub('\s+',' ', text)
+    return text
+dataset['text'] = dataset['text'].apply(cleansing)
+
+# Replace specific words
+replacement_dict = {
+    r'\b(ga)\b': 'gak',
+    r'\b(ngga|nggak|engga|enggak)\b': 'gak',
+    r'\b(gaada)\b': 'gak ada',
+    r'\b(pdhl)\b': 'padahal',
+    r'\b(lgsg)\b': 'langsung',
+    r'\b(bgtt{1,3})\b': 'banget',
+    r'\b(banget{1,3})\b': 'banget',
+    r'\b(stlh)\b': 'setelah',
+    r'\b(sukaa{1,3})\b': 'suka',
+    r'\b(seneng{2,3})\b': 'seneng'
+}
+
+def replace_words(text):
+    for pattern, replacement in replacement_dict.items():
+        text = re.sub(pattern, replacement, text)
+    return text
+
+dataset['text'] = dataset['text'].apply(replace_words)
+
+#NLTK word tokenize
+def word_tokenize_wrapper(text):
+    return word_tokenize(text)
+dataset['text'] = dataset['text'].apply(word_tokenize_wrapper)
 
 # Preprocessing: Stopword Removal
 custom_stopwords = ['adalah', 'adanya', 'adapun', 'agar', 'akan', 'akankah', 'akhir', 'akhiri', 'akhirnya', 'aku',
-                    'akulah', 'amat', 'amatlah', 'anda', 'andalah', 'antar', 'antara', 'antaranya', 'apa', 'apaan',
-                    'apabila', 'apakah', 'apatah', 'artinya', 'asal', 'asalkan', 'atas', 'atau', 'ataukah', 'ataupun',
-                    'awal', 'awalnya', 'bagai', 'bagaikan', 'bagaimana', 'bagaimanakah', 'bagaimanapun', 'bagi', 'bagian',
-                    'bahkan', 'bahwa', 'bahwasanya', 'baik', 'bakal', 'bakalan', 'balik', 'banyak', 'bapak', 'baru', 'bawah',
-                    'beberapa', 'begini', 'beginian', 'beginikah', 'beginilah', 'begitu', 'begitukah', 'begitulah', 'begitupun',
-                    'bekerja', 'belakang', 'belakangan', 'belumlah', 'benar', 'benarkah', 'benarlah', 'berada', 'berakhir',
-                    'berakhirlah', 'berakhirnya', 'berapa', 'berapakah', 'berapalah', 'berapapun', 'berarti', 'berawal', 'berbagai',
-                    'berdatangan', 'beri', 'berikan', 'berikut', 'berikutnya', 'berjumlah', 'berkali-kali', 'berkata', 'berkehendak',
-                    'berkeinginan', 'berkenaan', 'berlainan', 'berlalu', 'berlangsung', 'berlebihan', 'bermacam', 'bermacam-macam',
-                    'bermaksud', 'bermula', 'bersama', 'bersama-sama', 'bersiap', 'bersiap-siap', 'bertanya', 'bertanya-tanya',
-                    'berturut', 'berturut-turut', 'bertutur', 'berujar', 'berupa', 'besar', 'betulkah', 'bila', 'bilakah', 'bisa',
-                    'bisakah', 'bolehkah', 'buat', 'bukan', 'bukankah', 'bukanlah', 'bukannya', 'bulan', 'bung', 'cukupkah', 'dahulu',
-                    'dalam', 'dan', 'dapat', 'dari', 'daripada', 'datang', 'dekat', 'demi', 'demikian', 'demikianlah', 'dengan',
-                    'depan', 'di', 'dia', 'diakhiri', 'diakhirinya', 'dialah', 'diantara', 'diantaranya', 'diberi', 'diberikan',
-                    'diberikannya', 'dibuat', 'dibuatnya', 'didapat', 'didatangkan', 'diibaratkan', 'diibaratkannya', 'diingat',
-                    'diingatkan', 'diinginkan', 'dijawab', 'dijelaskan', 'dijelaskannya', 'dikarenakan', 'dikatakan', 'dikatakannya',
-                    'dikerjakan', 'diketahui','diketahuinya','dilakukan','dilalui','dilihat','dimaksud','dimaksudkan','dimaksudkannya',
-                    'dimaksudnya','diminta','dimintai','dimisalkan','dimulainya','dimungkinkan','dini','dipastikan','diperbuat',
-                    'diperbuatnya', 'dipergunakan','diperkirakan','diperlihatkan','diperlukan','diperlukannya','dipersoalkan','dipunyai',
-                    'diri','dirinya','disampaikan','disebut','disebutkan','disebutkannya','disini','disinilah','ditambahkan',
-                    'ditandaskan','ditanya','ditanyai','ditanyakan','ditegaskan','ditujukan','ditunjuk','ditunjuki','ditunjukkan',
-                    'ditunjukkannya','ditunjuknya','dituturkan', 'dituturkannya', 'diucapkan', 'diucapkannya', 'diungkapkan',
-                    'dong', 'dulu', 'empat', 'gunakan', 'hal', 'hanya', 'hanyalah', 'hari', 'haruslah', 'hendak', 'hendaklah',
-                    'hendaknya', 'hingga', 'ia', 'ialah', 'ibarat', 'ibaratkan', 'ibaratnya', 'ibu', 'ikut', 'ingat', 'ingat-ingat',
-                    'ingin', 'inginkah', 'inginkan', 'ini', 'inikah', 'inilah', 'itu', 'itukah', 'itulah', 'jadi', 'jadilah',
-                    'jadinya', 'jangan', 'jangankan', 'janganlah', 'jauh', 'jawab', 'jawaban', 'jawabnya', 'jelaskan', 'jelasnya',
-                    'jika', 'jikalau', 'juga', 'jumlah', 'jumlahnya', 'kala', 'kalaulah', 'kalaupun', 'kalian', 'kami', 'kamilah',
-                    'kamu', 'kamulah', 'kan', 'kapankah', 'kapanpun', 'karenanya', 'kasus', 'kata', 'katakan', 'katakanlah', 'katanya',
-                    'ke', 'keadaan', 'kebetulan', 'kecil', 'kedua', 'keduanya', 'keinginan', 'kelima', 'keluar', 'kembali', 'kemudian',
-                    'kepada', 'kepadanya', 'kesampaian', 'keseluruhan', 'keseluruhannya', 'keterlaluan', 'ketika', 'khususnya',
-                    'kini', 'kinilah', 'kiranya', 'kitalah', 'kok', 'lah', 'lalu', 'lanjut', 'lanjutnya', 'lebih', 'lewat', 'lima',
-                    'luar', 'macam', 'maka', 'makanya', 'mampukah', 'mana', 'manakala', 'manalagi', 'masa', 'masihkah', 'masing',
-                    'masing-masing', 'maupun', 'melainkan', 'melakukan', 'melalui', 'melihat', 'melihatnya', 'memang', 'memastikan',
-                    'memberi', 'memberikan', 'membuat', 'memerlukan', 'memihak', 'meminta', 'memintakan', 'memisalkan', 'memperbuat',
-                    'mempergunakan', 'memperkirakan', 'memperlihatkan', 'mempersiapkan', 'mempersoalkan', 'mempertanyakan', 'mempunyai',
-                    'memulai', 'memungkinkan', 'menaiki', 'menandaskan', 'menantikan', 'menanya', 'menanyai', 'menanyakan', 'mendapat',
-                    'mendatang', 'mendatangi', 'mendatangkan', 'menegaskan', 'mengatakan', 'mengatakannya', 'mengenai', 'mengerjakan',
-                    'mengetahui', 'menghendaki', 'mengibaratkan', 'mengibaratkannya', 'mengingat', 'mengingatkan', 'menginginkan',
-                    'mengira', 'mengucapkan', 'mengucapkannya', 'mengungkapkan', 'menjawab', 'menjelaskan', 'menuju', 'menunjuk',
-                    'menunjuki', 'menunjukkan', 'menunjuknya', 'menurut', 'menuturkan', 'menyampaikan', 'menyangkut', 'menyatakan',
-                    'menyebutkan', 'menyeluruh', 'menyiapkan', 'mereka', 'merekalah', 'merupakan', 'meyakini', 'meyakinkan', 'minta',
-                    'mirip', 'misal', 'misalkan', 'misalnya', 'mula', 'mulai', 'mulailah', 'mungkin', 'mungkinkah', 'nah', 'naik',
-                    'nyaris', 'nyatanya', 'oleh', 'olehnya', 'pada', 'padanya', 'pak', 'paling', 'panjang', 'pantas', 'para', 'pasti',
-                    'pastilah', 'penting', 'pentingnya', 'per', 'perlukah', 'perlunya', 'persoalan', 'pertama', 'pertanyaan',
-                    'pertanyakan', 'pihak', 'pihaknya', 'pukul', 'pula', 'pun', 'punya', 'saatnya', 'saling', 'sama-sama', 'sambil',
-                    'sampai', 'sampai-sampai', 'sampaikan', 'sana', 'saya', 'sayalah', 'se', 'sebab', 'sebabnya', 'sebagai',
-                    'sebagaimana', 'sebagainya', 'sebagian', 'sebaik', 'sebaik-baiknya', 'sebaliknya', 'sebanyak', 'sebegini',
-                    'sebegitu', 'sebelum', 'sebenarnya', 'seberapa', 'sebesar', 'sebisanya', 'sebuah', 'sebut', 'sebutlah',
-                    'sebutnya', 'secara', 'sedemikian', 'seenaknya', 'segala', 'segalanya', 'seingat', 'sejauh', 'sejenak',
-                    'sejumlah', 'sekadar', 'sekadarnya', 'sekali', 'sekalian', 'sekecil', 'seketika', 'sekiranya', 'sekitarnya',
-                    'sekurang-kurangnya', 'sekurangnya', 'sela', 'selain', 'selaku', 'selanjutnya', 'seluruhnya', 'semacam', 'semampu',
-                    'semampunya', 'semasa', 'semasih', 'semata', 'semata-mata', 'semaunya', 'sempat', 'sendirian', 'sendirinya', 'seolah',
-                    'seolah-olah', 'seorang', 'sepanjang', 'sepantasnya', 'sepantasnyalah', 'seperlunya', 'seperti', 'sepertinya',
-                    'sepihak', 'seringnya', 'serta', 'serupa', 'sesaat', 'sesama', 'sesampai', 'sesegera', 'seseorang', 'sesuatu',
-                    'sesuatunya', 'sesudah', 'sesudahnya', 'setelah', 'setempat', 'setengah', 'seterusnya', 'setiap', 'setiba',
-                    'setibanya', 'setidak-tidaknya', 'setidaknya', 'sela', 'selain', 'selaku', 'selanjutnya', 'seluruhnya', 'semacam',
-                    'semampu', 'semampunya', 'semasa', 'semasih', 'semata', 'semata-mata', 'semaunya', 'sempat', 'sendirian',
-                    'sendirinya', 'seolah', 'seolah-olah', 'seorang', 'sepanjang', 'sepantasnya', 'sepantasnyalah', 'seperlunya',
-                    'seperti', 'sepertinya', 'sepihak', 'seringnya', 'serta', 'serupa', 'sesaat', 'sesama', 'sesampai', 'sesegera',
-                    'seseorang', 'sesuatu', 'sesuatunya', 'sesudah', 'sesudahnya', 'setelah', 'setempat', 'setengah', 'seterusnya',
-                    'setiap', 'setiba', 'setibanya', 'setidak-tidaknya', 'setidaknya', 'sila', 'silakan', 'sini', 'sinilah', 'soal',
-                    'suatu', 'sudah', 'sudahkah', 'sudahlah', 'supaya', 'tadi', 'tadinya', 'tahu', 'tahun', 'tak', 'tambahnya',
-                    'tampaknya', 'tandas', 'tandasnya', 'tanya', 'tanyakan', 'tanyanya', 'tegas', 'tegasnya', 'telah', 'tempat',
-                    'tengah', 'tentang', 'tentu', 'tentulah', 'tentunya', 'tepat', 'terakhir', 'terasa', 'terbanyak', 'terdahulu',
-                    'terdapat', 'terdiri', 'terhadap', 'terhadapnya', 'teringat', 'teringat-ingat', 'terjadilah', 'terjadinya',
-                    'terkira', 'tersampaikan', 'tersebut', 'tersebutlah', 'tertentu', 'tertuju', 'tidakkah', 'tidaklah', 'tiga',
-                    'tinggi', 'toh', 'tunjuk', 'turut', 'tutur', 'tuturnya', 'ucap', 'ucapnya', 'ujar', 'ujarnya', 'ungkap', 'ungkapnya',
-                    'usai', 'waduh', 'wah', 'wahai', 'waktunya', 'walau', 'wong', 'yaitu', 'yakni', 'bener', 'beneran', 'pertama', 'SMA',
-                    'aku', 'ini', 'buat', 'yang', 'dan', 'berbagai', 'setelah', 'guys', '10% niacinamide', '5% niacinamide', 'aja',
-                    'pemakaian', 'kepo', 'penasaran', 'alhamdulillah', '1', '2', '3', 'kedua', 'ketiga', 'deh', 'besok', 'gue',
-                    'produk', 'skincare', 'konsentrasi', 'member', 'adanya', 'karena', 'fd', 'female daily', 'somethinc', 'official',
-                    'store', 'e-commerce', 'shopee', 'malam', 'niacin', 'mix', 'feeling', 'SMP', 'anak', 'to', 'jadiin', 'pol', 'vit',
-                    'c', 'vitamin', 'pagi', 'paginya', 'online']
+                    ]
 
-def remove_stopwords(tokens):
-    filtered_tokens = [word for word in tokens if word not in custom_stopwords]
-    return filtered_tokens
+def stopword_removal(Review):
+    filtering = stopwords.words('indonesian','english')
+    filtering.extend(custom_stopwords)
+    x = []
+    data = []
+    def myFunc(x):
+        if x in filtering:
+            return False
+        else:
+            return True
+    fit = filter(myFunc, Review)
+    for x in fit:
+        data.append(x)
+    return data
+dataset['text'] = dataset['text'].apply(stopword_removal)
 
-dataset['text'] = dataset['text'].apply(remove_stopwords)
+def stemming(text):
+    factory = StemmerFactory()
+    stemmer = factory.create_stemmer()
+    do = []
+    for w in text:
+        dt = stemmer.stem(w)
+        do.append(dt)
+    d_clean = " ".join(do)
+    return d_clean
 
-# Preprocessing: Stemming
-factory = StemmerFactory()
-stemmer = factory.create_stemmer()
 
-def stem_tokens(tokens):
-    stemmed_tokens = [stemmer.stem(token) for token in tokens]
-    return stemmed_tokens
+# Check if table exists in the database
+cursor.execute("SHOW TABLES LIKE 'stemmed_data'")
+table_exists = cursor.fetchone()
 
-dataset['text'] = dataset['text'].apply(stem_tokens)
+if table_exists:
+    print("Table 'stemmed_data' already exists. Skipping data insertion.")
+else:
+    # Create a new table for stemmed data
+    cursor.execute("CREATE TABLE stemmed_data (text VARCHAR(255), sentimen VARCHAR(255))")
+    conn.commit()
+
+    # Insert stemmed data into the database
+    for text, sentiment in zip(dataset['text'], dataset['sentimen']):
+        stemmed_text = stemming(text)  # Convert list to string
+        insert_query = "INSERT INTO stemmed_data (text, sentimen) VALUES (%s, %s)"
+        values = (stemmed_text, sentiment)
+        cursor.execute(insert_query, values)
+        conn.commit()
+
+
 
 # Pembagian Dataset menjadi Data Training dan Testing
 X = dataset['text']
-y = dataset['sentiment']
+y = dataset['sentimen']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -147,20 +151,65 @@ print(classification_report(y_test, y_pred))
 def index():
     return render_template('index.html')
 
-@app.route('/classify', methods=['POST'])
+@app.route('/classify', methods=['GET', 'POST'])
 def classify():
-    text = request.form['text']
-    stemmed_text = [stemmer.stem(word) for word in word_tokenize(text.lower())]
-    vectorized_text = vectorizer.transform([' '.join(stemmed_text)])
-    prediction = nb_classifier.predict(vectorized_text)[0]
-    if prediction == 'negatif':
-        result = 'Sentimen: Negatif'
-    elif prediction == 'positif':
-        result = 'Sentimen: Positif'
-    else:
-        result = 'Sentimen: Netral'
-    return render_template('result.html', result=result)
+    if request.method == 'POST':
+        text = request.form['text']
+        
+        # Preprocessing: Case Folding
+        text = text.lower()
+        
+        # Preprocessing: Cleansing
+        text = cleansing(text)
+        
+        # Preprocessing: Replace specific words
+        text = replace_words(text)
+        
+        # NLTK word tokenize
+        text_tokens = word_tokenize_wrapper(text)
+        
+        # Preprocessing: Stopword Removal
+        text_tokens = stopword_removal(text_tokens)
+        
+        # Preprocessing: Stemming
+        stemmed_text = stemming(text_tokens)
+        
+        vectorized_text = vectorizer.transform([stemmed_text])
+        prediction = nb_classifier.predict(vectorized_text)[0]
+        
+        if prediction == 'Negatif':
+            result = 'Sentimen: Negatif'
+        elif prediction == 'Positif':
+            result = 'Sentimen: Positif'
+        else:
+            result = 'Sentimen: Netral'
 
+        # Menambahkan data masukan ke dalam database
+        insert_query = "INSERT INTO training_new (text, sentimen) VALUES (%s, %s)"
+        values = (text.lower(), prediction)
+        cursor.execute(insert_query, values)
+        conn.commit()
+
+        # Memperbarui dataset dengan data terbaru
+        dataset.loc[len(dataset)] = [text.lower(), prediction]
+
+        # Evaluasi Model Terbaru
+        X = dataset['text']
+        y = dataset['sentimen']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Feature Extraction menggunakan Bag of Words
+        X_train = vectorizer.fit_transform(X_train.apply(' '.join))
+        X_test = vectorizer.transform(X_test.apply(' '.join))
+        
+        nb_classifier.fit(X_train, y_train)
+        y_pred = nb_classifier.predict(X_test)
+        cm = confusion_matrix(y_test, y_pred)
+        accuracy = accuracy_score(y_test, y_pred)
+
+        return render_template('result.html', result=result, cm=cm, accuracy=accuracy, stemmed_text=stemmed_text)
+    else:
+        return render_template('index.html')
 
 if __name__=="__main__":
     app.run(debug=True)
