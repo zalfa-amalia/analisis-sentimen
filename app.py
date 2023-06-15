@@ -46,15 +46,16 @@ replacement_dict = {
     r'\b(pdhl)\b': 'padahal',
     r'\b(lgsg)\b': 'langsung',
     r'\b(bgtt{1,3})\b': 'banget',
-    r'\b(banget{1,3})\b': 'banget',
+    r'\b(banget{1,10})\b': 'banget',
     r'\b(stlh)\b': 'setelah',
-    r'\b(sukaa{1,3})\b': 'suka',
-    r'\b(seneng{2,3})\b': 'seneng'
+    r'\b(sukaa{1,10})\b': 'suka',
+    r'\b(seneng{2,3})\b': 'seneng',
+    r'\b(gila{2,10})\b': 'gila'
 }
 
 def replace_words(text):
     for pattern, replacement in replacement_dict.items():
-        text = re.sub(pattern, replacement, text)
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
     return text
 
 dataset['text'] = dataset['text'].apply(replace_words)
