@@ -11,8 +11,11 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from nltk.corpus import stopwords
 import mysql.connector
 import re
+import matplotlib.pyplot as plt
+import os
 
 app = Flask(__name__, template_folder='template')
+app.static_folder = 'static'
 
 # Koneksi ke database MySQL
 conn = mysql.connector.connect(
@@ -115,8 +118,6 @@ else:
         cursor.execute(insert_query, values)
         conn.commit()
 
-
-
 # Pembagian Dataset menjadi Data Training dan Testing
 X = dataset['text']
 y = dataset['sentimen']
@@ -156,28 +157,28 @@ def index():
 def classify():
     if request.method == 'POST':
         text = request.form['text']
-        
+
         # Preprocessing: Case Folding
         text = text.lower()
-        
+
         # Preprocessing: Cleansing
         text = cleansing(text)
-        
+
         # Preprocessing: Replace specific words
         text = replace_words(text)
-        
+
         # NLTK word tokenize
         text_tokens = word_tokenize_wrapper(text)
-        
+
         # Preprocessing: Stopword Removal
         text_tokens = stopword_removal(text_tokens)
-        
+
         # Preprocessing: Stemming
         stemmed_text = stemming(text_tokens)
-        
+
         vectorized_text = vectorizer.transform([stemmed_text])
         prediction = nb_classifier.predict(vectorized_text)[0]
-        
+
         if prediction == 'Negatif':
             result = 'Sentimen: Negatif'
         elif prediction == 'Positif':
@@ -198,19 +199,35 @@ def classify():
         X = dataset['text']
         y = dataset['sentimen']
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
+
         # Feature Extraction menggunakan Bag of Words
         X_train = vectorizer.fit_transform(X_train.apply(' '.join))
         X_test = vectorizer.transform(X_test.apply(' '.join))
-        
+
         nb_classifier.fit(X_train, y_train)
         y_pred = nb_classifier.predict(X_test)
         cm = confusion_matrix(y_test, y_pred)
         accuracy = accuracy_score(y_test, y_pred)
 
+        # Visualisasi dengan Pie Chart (Data Training)
+        labels_train = ['Negatif', 'Positif', 'Netral']
+        counts_train = y_train.value_counts()
+        sizes_train = [counts_train['Negatif'], counts_train['Positif'], counts_train['Netral']]
+        colors_train = ['red', 'green', 'blue']
+        explode_train = (0.1, 0, 0)  # Memisahkan slice untuk sentimen negatif
+
+        fig_train, ax_train = plt.subplots()
+        ax_train.pie(sizes_train, explode=explode_train, labels=labels_train, colors=colors_train, autopct='%1.1f%%', startangle=90)
+        ax_train.axis('equal')  # Memastikan pie chart berbentuk lingkaran
+        ax_train.set_title('Distribusi Sentimen Data Training')
+
+        # Menyimpan visualisasi data training sebagai file gambar
+        plt.savefig('static/pie_chart.png')
+
         return render_template('result.html', result=result, cm=cm, accuracy=accuracy, stemmed_text=stemmed_text)
     else:
         return render_template('index.html')
+
 
 if __name__=="__main__":
     app.run(debug=True)
