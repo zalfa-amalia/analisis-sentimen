@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
@@ -12,7 +13,8 @@ from nltk.corpus import stopwords
 import mysql.connector
 import re
 import matplotlib.pyplot as plt
-import os
+from scipy.sparse import csr_matrix
+from wordcloud import WordCloud
 
 app = Flask(__name__, template_folder='template')
 app.static_folder = 'static'
@@ -70,7 +72,79 @@ dataset['text'] = dataset['text'].apply(word_tokenize_wrapper)
 
 # Preprocessing: Stopword Removal
 custom_stopwords = ['adalah', 'adanya', 'adapun', 'agar', 'akan', 'akankah', 'akhir', 'akhiri', 'akhirnya', 'aku',
-                    ]
+                    'akulah', 'amat', 'amatlah', 'anda', 'andalah', 'antar', 'antara', 'antaranya', 'apa', 'apaan',
+                    'apabila', 'apakah', 'apatah', 'artinya', 'asal', 'asalkan', 'atas', 'atau', 'ataukah', 'ataupun',
+                    'awal', 'awalnya', 'bagai', 'bagaikan', 'bagaimana', 'bagaimanakah', 'bagaimanapun', 'bagi', 'bagian',
+                    'bahkan', 'bahwa', 'bahwasanya', 'baik', 'bakal', 'bakalan', 'balik', 'banyak', 'bapak', 'baru', 'bawah',
+                    'beberapa', 'begini', 'beginian', 'beginikah', 'beginilah', 'begitu', 'begitukah', 'begitulah', 'begitupun',
+                    'bekerja', 'belakang', 'belakangan', 'belumlah', 'benar', 'benarkah', 'benarlah', 'berada', 'berakhir',
+                    'berakhirlah', 'berakhirnya', 'berapa', 'berapakah', 'berapalah', 'berapapun', 'berarti', 'berawal', 'berbagai',
+                    'berdatangan', 'beri', 'berikan', 'berikut', 'berikutnya', 'berjumlah', 'berkali-kali', 'berkata', 'berkehendak',
+                    'berkeinginan', 'berkenaan', 'berlainan', 'berlalu', 'berlangsung', 'berlebihan', 'bermacam', 'bermacam-macam',
+                    'bermaksud', 'bermula', 'bersama', 'bersama-sama', 'bersiap', 'bersiap-siap', 'bertanya', 'bertanya-tanya',
+                    'berturut', 'berturut-turut', 'bertutur', 'berujar', 'berupa', 'besar', 'betulkah', 'bila', 'bilakah', 'bisa',
+                    'bisakah', 'bolehkah', 'buat', 'bukan', 'bukankah', 'bukanlah', 'bukannya', 'bulan', 'bung', 'cukupkah', 'dahulu',
+                    'dalam', 'dan', 'dapat', 'dari', 'daripada', 'datang', 'dekat', 'demi', 'demikian', 'demikianlah', 'dengan',
+                    'depan', 'di', 'dia', 'diakhiri', 'diakhirinya', 'dialah', 'diantara', 'diantaranya', 'diberi', 'diberikan',
+                    'diberikannya', 'dibuat', 'dibuatnya', 'didapat', 'didatangkan', 'diibaratkan', 'diibaratkannya', 'diingat',
+                    'diingatkan', 'diinginkan', 'dijawab', 'dijelaskan', 'dijelaskannya', 'dikarenakan', 'dikatakan', 'dikatakannya',
+                    'dikerjakan', 'diketahui','diketahuinya','dilakukan','dilalui','dilihat','dimaksud','dimaksudkan','dimaksudkannya',
+                    'dimaksudnya','diminta','dimintai','dimisalkan','dimulainya','dimungkinkan','dini','dipastikan','diperbuat',
+                    'diperbuatnya', 'dipergunakan','diperkirakan','diperlihatkan','diperlukan','diperlukannya','dipersoalkan','dipunyai',
+                    'diri','dirinya','disampaikan','disebut','disebutkan','disebutkannya','disini','disinilah','ditambahkan',
+                    'ditandaskan','ditanya','ditanyai','ditanyakan','ditegaskan','ditujukan','ditunjuk','ditunjuki','ditunjukkan',
+                    'ditunjukkannya','ditunjuknya','dituturkan', 'dituturkannya', 'diucapkan', 'diucapkannya', 'diungkapkan',
+                    'dong', 'dulu', 'empat', 'gunakan', 'hal', 'hanya', 'hanyalah', 'hari', 'haruslah', 'hendak', 'hendaklah',
+                    'hendaknya', 'hingga', 'ia', 'ialah', 'ibarat', 'ibaratkan', 'ibaratnya', 'ibu', 'ikut', 'ingat', 'ingat-ingat',
+                    'ingin', 'inginkah', 'inginkan', 'ini', 'inikah', 'inilah', 'itu', 'itukah', 'itulah', 'jadi', 'jadilah',
+                    'jadinya', 'jangan', 'jangankan', 'janganlah', 'jauh', 'jawab', 'jawaban', 'jawabnya', 'jelaskan', 'jelasnya',
+                    'jika', 'jikalau', 'juga', 'jumlah', 'jumlahnya', 'kala', 'kalaulah', 'kalaupun', 'kalian', 'kami', 'kamilah',
+                    'kamu', 'kamulah', 'kan', 'kapankah', 'kapanpun', 'karenanya', 'kasus', 'kata', 'katakan', 'katakanlah', 'katanya',
+                    'ke', 'keadaan', 'kebetulan', 'kecil', 'kedua', 'keduanya', 'keinginan', 'kelima', 'keluar', 'kembali', 'kemudian',
+                    'kepada', 'kepadanya', 'kesampaian', 'keseluruhan', 'keseluruhannya', 'keterlaluan', 'ketika', 'khususnya',
+                    'kini', 'kinilah', 'kiranya', 'kitalah', 'kok', 'lah', 'lalu', 'lanjut', 'lanjutnya', 'lebih', 'lewat', 'lima',
+                    'luar', 'macam', 'maka', 'makanya', 'mampukah', 'mana', 'manakala', 'manalagi', 'masa', 'masihkah', 'masing',
+                    'masing-masing', 'maupun', 'melainkan', 'melakukan', 'melalui', 'melihat', 'melihatnya', 'memang', 'memastikan',
+                    'memberi', 'memberikan', 'membuat', 'memerlukan', 'memihak', 'meminta', 'memintakan', 'memisalkan', 'memperbuat',
+                    'mempergunakan', 'memperkirakan', 'memperlihatkan', 'mempersiapkan', 'mempersoalkan', 'mempertanyakan', 'mempunyai',
+                    'memulai', 'memungkinkan', 'menaiki', 'menandaskan', 'menantikan', 'menanya', 'menanyai', 'menanyakan', 'mendapat',
+                    'mendatang', 'mendatangi', 'mendatangkan', 'menegaskan', 'mengatakan', 'mengatakannya', 'mengenai', 'mengerjakan',
+                    'mengetahui', 'menghendaki', 'mengibaratkan', 'mengibaratkannya', 'mengingat', 'mengingatkan', 'menginginkan',
+                    'mengira', 'mengucapkan', 'mengucapkannya', 'mengungkapkan', 'menjawab', 'menjelaskan', 'menuju', 'menunjuk',
+                    'menunjuki', 'menunjukkan', 'menunjuknya', 'menurut', 'menuturkan', 'menyampaikan', 'menyangkut', 'menyatakan',
+                    'menyebutkan', 'menyeluruh', 'menyiapkan', 'mereka', 'merekalah', 'merupakan', 'meyakini', 'meyakinkan', 'minta',
+                    'mirip', 'misal', 'misalkan', 'misalnya', 'mula', 'mulai', 'mulailah', 'mungkin', 'mungkinkah', 'nah', 'naik',
+                    'nyaris', 'nyatanya', 'oleh', 'olehnya', 'pada', 'padanya', 'pak', 'paling', 'panjang', 'pantas', 'para', 'pasti',
+                    'pastilah', 'penting', 'pentingnya', 'per', 'perlukah', 'perlunya', 'persoalan', 'pertama', 'pertanyaan',
+                    'pertanyakan', 'pihak', 'pihaknya', 'pukul', 'pula', 'pun', 'punya', 'saatnya', 'saling', 'sama-sama', 'sambil',
+                    'sampai', 'sampai-sampai', 'sampaikan', 'sana', 'saya', 'sayalah', 'se', 'sebab', 'sebabnya', 'sebagai',
+                    'sebagaimana', 'sebagainya', 'sebagian', 'sebaik', 'sebaik-baiknya', 'sebaliknya', 'sebanyak', 'sebegini',
+                    'sebegitu', 'sebelum', 'sebenarnya', 'seberapa', 'sebesar', 'sebisanya', 'sebuah', 'sebut', 'sebutlah',
+                    'sebutnya', 'secara', 'sedemikian', 'seenaknya', 'segala', 'segalanya', 'seingat', 'sejauh', 'sejenak',
+                    'sejumlah', 'sekadar', 'sekadarnya', 'sekali', 'sekalian', 'sekecil', 'seketika', 'sekiranya', 'sekitarnya',
+                    'sekurang-kurangnya', 'sekurangnya', 'sela', 'selain', 'selaku', 'selanjutnya', 'seluruhnya', 'semacam', 'semampu',
+                    'semampunya', 'semasa', 'semasih', 'semata', 'semata-mata', 'semaunya', 'sempat', 'sendirian', 'sendirinya', 'seolah',
+                    'seolah-olah', 'seorang', 'sepanjang', 'sepantasnya', 'sepantasnyalah', 'seperlunya', 'seperti', 'sepertinya',
+                    'sepihak', 'seringnya', 'serta', 'serupa', 'sesaat', 'sesama', 'sesampai', 'sesegera', 'seseorang', 'sesuatu',
+                    'sesuatunya', 'sesudah', 'sesudahnya', 'setelah', 'setempat', 'setengah', 'seterusnya', 'setiap', 'setiba',
+                    'setibanya', 'setidak-tidaknya', 'setidaknya', 'sela', 'selain', 'selaku', 'selanjutnya', 'seluruhnya', 'semacam',
+                    'semampu', 'semampunya', 'semasa', 'semasih', 'semata', 'semata-mata', 'semaunya', 'sempat', 'sendirian',
+                    'sendirinya', 'seolah', 'seolah-olah', 'seorang', 'sepanjang', 'sepantasnya', 'sepantasnyalah', 'seperlunya',
+                    'seperti', 'sepertinya', 'sepihak', 'seringnya', 'serta', 'serupa', 'sesaat', 'sesama', 'sesampai', 'sesegera',
+                    'seseorang', 'sesuatu', 'sesuatunya', 'sesudah', 'sesudahnya', 'setelah', 'setempat', 'setengah', 'seterusnya',
+                    'setiap', 'setiba', 'setibanya', 'setidak-tidaknya', 'setidaknya', 'sila', 'silakan', 'sini', 'sinilah', 'soal',
+                    'suatu', 'sudah', 'sudahkah', 'sudahlah', 'supaya', 'tadi', 'tadinya', 'tahu', 'tahun', 'tak', 'tambahnya',
+                    'tampaknya', 'tandas', 'tandasnya', 'tanya', 'tanyakan', 'tanyanya', 'tegas', 'tegasnya', 'telah', 'tempat',
+                    'tengah', 'tentang', 'tentu', 'tentulah', 'tentunya', 'tepat', 'terakhir', 'terasa', 'terbanyak', 'terdahulu',
+                    'terdapat', 'terdiri', 'terhadap', 'terhadapnya', 'teringat', 'teringat-ingat', 'terjadilah', 'terjadinya',
+                    'terkira', 'tersampaikan', 'tersebut', 'tersebutlah', 'tertentu', 'tertuju', 'tidakkah', 'tidaklah', 'tiga',
+                    'tinggi', 'toh', 'tunjuk', 'turut', 'tutur', 'tuturnya', 'ucap', 'ucapnya', 'ujar', 'ujarnya', 'ungkap', 'ungkapnya',
+                    'usai', 'waduh', 'wah', 'wahai', 'waktunya', 'walau', 'wong', 'yaitu', 'yakni', 'bener', 'beneran', 'pertama', 'SMA',
+                    'aku', 'ini', 'buat', 'yang', 'dan', 'berbagai', 'setelah', 'guys', '10% niacinamide', '5% niacinamide', 'aja',
+                    'pemakaian', 'kepo', 'penasaran', 'alhamdulillah', '1', '2', '3', 'kedua', 'ketiga', 'deh', 'besok', 'gue',
+                    'produk', 'skincare', 'konsentrasi', 'member', 'adanya', 'karena', 'fd', 'female daily', 'somethinc', 'official',
+                    'store', 'e-commerce', 'shopee', 'malam', 'niacin', 'mix', 'feeling', 'SMP', 'anak', 'to', 'jadiin', 'pol', 'vit',
+                    'c', 'vitamin', 'pagi', 'paginya', 'online', 'gitu','banget','bgt','gak','tp','nya']
 
 def stopword_removal(Review):
     filtering = stopwords.words('indonesian','english')
@@ -99,24 +173,24 @@ def stemming(text):
     return d_clean
 
 
-# Check if table exists in the database
-cursor.execute("SHOW TABLES LIKE 'stemmed_data'")
-table_exists = cursor.fetchone()
+# Check if column exists in the table
+cursor.execute("SHOW COLUMNS FROM stemmed_data LIKE 'sentimen'")
+column_exists = cursor.fetchone()
 
-if table_exists:
-    print("Table 'stemmed_data' already exists. Skipping data insertion.")
+if column_exists:
+    print("Column 'sentimen' already exists. Skipping data insertion.")
 else:
-    # Create a new table for stemmed data
-    cursor.execute("CREATE TABLE stemmed_data (text VARCHAR(255), sentimen VARCHAR(255))")
+    # Alter the table and modify the data type of 'sentimen' column
+    cursor.execute("ALTER TABLE stemmed_data MODIFY sentimen VARCHAR(255)")
     conn.commit()
 
     # Insert stemmed data into the database
-    for text, sentiment in zip(dataset['text'], dataset['sentimen']):
-        stemmed_text = stemming(text)  # Convert list to string
-        insert_query = "INSERT INTO stemmed_data (text, sentimen) VALUES (%s, %s)"
-        values = (stemmed_text, sentiment)
-        cursor.execute(insert_query, values)
-        conn.commit()
+    # for text, sentiment in zip(dataset['text'], dataset['sentimen']):
+    #     stemmed_text = stemming(text)  # Convert list to string
+    #     insert_query = "INSERT INTO training_new (text, sentimen) VALUES (%s, %s)"
+    #     values = (text.lower().encode('utf-8'), prediction.encode('utf-8'))
+    #     cursor.execute(insert_query, values)
+    #     conn.commit()
 
 # Pembagian Dataset menjadi Data Training dan Testing
 X = dataset['text']
@@ -196,9 +270,9 @@ def classify():
         dataset.loc[len(dataset)] = [text.lower(), prediction]
 
         # Evaluasi Model Terbaru
-        X = dataset['text']
-        y = dataset['sentimen']
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_testing = dataset['text']
+        y_testing= dataset['sentimen']
+        X_train, X_test, y_train, y_test = train_test_split(X_testing, y_testing, test_size=0.2, random_state=42)
 
         # Feature Extraction menggunakan Bag of Words
         X_train = vectorizer.fit_transform(X_train.apply(' '.join))
@@ -209,22 +283,36 @@ def classify():
         cm = confusion_matrix(y_test, y_pred)
         accuracy = accuracy_score(y_test, y_pred)
 
-        # Visualisasi dengan Pie Chart (Data Training)
+        # Visualisasi dengan Pie Chart (Testing Data)
         labels_train = ['Negatif', 'Positif', 'Netral']
         counts_train = y_train.value_counts()
         sizes_train = [counts_train['Negatif'], counts_train['Positif'], counts_train['Netral']]
         colors_train = ['red', 'green', 'blue']
-        explode_train = (0.1, 0, 0)  # Memisahkan slice untuk sentimen negatif
+        explode_train = (0.1, 0.1, 0.1)  # Memisahkan slice untuk sentimen negatif
 
         fig_train, ax_train = plt.subplots()
         ax_train.pie(sizes_train, explode=explode_train, labels=labels_train, colors=colors_train, autopct='%1.1f%%', startangle=90)
         ax_train.axis('equal')  # Memastikan pie chart berbentuk lingkaran
         ax_train.set_title('Distribusi Sentimen Data Training')
+        
+        # Generate timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        
+        # Save the pie chart image with the timestamp
+        file_name = f'static/pie_chart_{timestamp}.png'
+        plt.savefig(file_name)
 
-        # Menyimpan visualisasi data training sebagai file gambar
-        plt.savefig('static/pie_chart.png')
 
-        return render_template('result.html', result=result, cm=cm, accuracy=accuracy, stemmed_text=stemmed_text)
+         # Generate word cloud
+        word_cloud_text = ' '.join(X_testing.astype(str))
+        if word_cloud_text:
+            word_cloud = WordCloud(width=800, height=400, background_color='white', max_words=100).generate(word_cloud_text)
+            word_cloud_filename = f'static/word_cloud_{timestamp}.png'
+            word_cloud.to_file(word_cloud_filename)
+        else:
+            word_cloud_filename = None
+        # Render the template with the result and timestamp
+        return render_template('result.html', result=result, accuracy=accuracy, word_cloud=word_cloud_filename,stemmed_text=stemmed_text, timestamp=timestamp)
     else:
         return render_template('index.html')
 
