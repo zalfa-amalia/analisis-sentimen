@@ -14,7 +14,7 @@ import mysql.connector
 import re
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
-from wordcloud import WordCloud
+# from wordcloud import WordCloud
 import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -149,7 +149,7 @@ y_pred = nb_classifier.predict(X_test)
 
 # Confusion Matrix
 cm = confusion_matrix(y_test, y_pred)
-labels = ['Negatif', 'Netral',"Positif"]  # Define the labels
+labels = ['Positif', 'Negatif',"Netral"]  # Define the labels
 
 # Create a heatmap from the confusion matrix
 sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)  # Add xticklabels and yticklabels parameters
@@ -184,25 +184,26 @@ def classify():
         text = request.form['text']
 
         # Preprocessing: Case Folding
-        text = text.lower()
+        Case_Folding = text.lower()
 
         # Preprocessing: Cleansing
-        text = cleansing(text)
+        Cleansing = cleansing(Case_Folding)
 
         # Preprocessing: Replace specific words
-        text = replace_words(text)
+        specific_words = replace_words(Cleansing)
 
         # NLTK word tokenize
-        text_tokens = word_tokenize_wrapper(text)
+        text_token = word_tokenize_wrapper(specific_words)
 
         # Preprocessing: Stopword Removal
-        text_tokens = stopword_removal(text_tokens)
+        text_tokens = stopword_removal(text_token)
 
         # Preprocessing: Stemming
         stemmed_text = stemming(text_tokens)
 
         vectorized_text = vectorizer.transform([stemmed_text])
-        prediction = nb_classifier.predict(vectorized_text)[0]
+        # Convert 'prediction' variable to a string before insertion
+        prediction = str(nb_classifier.predict(vectorized_text)[0])
 
         if prediction == 'Negatif':
             result = 'Hasil Sentimen: Negatif'
@@ -254,15 +255,16 @@ def classify():
         plt.savefig(file_name)
 
          # Generate word cloud
-        word_cloud_text = ' '.join(X_testing.astype(str))
-        if word_cloud_text:
-            word_cloud = WordCloud(width=800, height=400, background_color='white', max_words=100).generate(word_cloud_text)
-            word_cloud_filename = f'static/word_cloud_{timestamp}.png'
-            word_cloud.to_file(word_cloud_filename)
-        else:
-            word_cloud_filename = None
+        # word_cloud_text = ' '.join(X_testing.astype(str))
+        # if word_cloud_text:
+        #     word_cloud = WordCloud(width=800, height=400, background_color='white', max_words=100).generate(word_cloud_text)
+        #     word_cloud_filename = f'static/word_cloud_{timestamp}.png'
+        #     word_cloud.to_file(word_cloud_filename)
+        # else:
+        #     word_cloud_filename = None
         # Render the template with the result and timestamp
-        return render_template('result.html', result=result, accuracy=accuracy, word_cloud=word_cloud_filename,stemmed_text=stemmed_text, timestamp=timestamp)
+        return render_template('result.html', result=result, accuracy=accuracy,stemmed_text=stemmed_text,
+                               Cleansing=Cleansing,specific_words=specific_words,text_token=text_token,text_tokens=text_tokens ,timestamp=timestamp, Case_Folding=Case_Folding)
     else:
         return render_template('index.html')
 

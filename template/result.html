@@ -8,6 +8,26 @@
     <h2>{{ result }}</h2>
     <h3>{{ accuracy }}</h3>
     <h4>{{ stemmed_text }}</h4>
+    <div class="clean">
+        <table style="width:100%">
+            <tr>
+              <th>Case_Folding</th>
+              <th>Cleansing</th>
+              <th>specific_words</th>
+              <th>NLTK word tokenize</th>
+              <th>Preprocessing: Stopword Removal</th>
+              <th>Preprocessing: Stemming</th>
+            </tr>
+            <tr>
+              <td>{{Case_Folding}}</td>
+              <td>{{Cleansing}}</td>
+              <td>{{specific_words}}</td>
+              <td>{{text_token}}</td>
+              <td>{{text_tokens}}</td>
+              <td>{{stemmed_text}}</td>
+            </tr>
+          </table>
+    </div>
     <div class="chart-container">
         <!-- <div>
             <h2>Visualisasi Distribusi Sentimen (Hasil Klasifikasi):</h2>
