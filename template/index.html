@@ -3,13 +3,41 @@
 <head>
     <title>Analisis Sentimen</title>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-</head>
-<body>
-    <h1>Analisis Sentimen</h1>
-    <textarea id="inputText" rows="4" cols="50" placeholder="Masukkan teks..."></textarea><br><br>
-    <button onclick="submitText()">Analisis</button>
+    <style>
+      .button {
+        border: none;
+        color: white;
+        font-weight: 100;
+        padding: 10px 15px;
+        align-items: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin-top: -10px;
+        transition-duration: 0.4s;
+        cursor: pointer;
+      }
 
-    <h2>Hasil Analisis:</h2>
+      .button {
+        background-color: white; 
+        color: #457cd6; 
+        border: 2px solid #457cd6;
+        border-radius: 30px;
+      }
+
+      .button:hover {
+        background-color: #457cd6;
+        color: white;
+      }
+    </style>
+</head>
+
+<body>
+    <div class="header"></div>
+    <h1>Analisis Sentimen</h1>
+    <textarea id="inputText" rows="5" cols="100" placeholder="Masukkan teks review..."></textarea><br><br>
+    <button class="button" onclick="submitText()">result</button>
+
     <p id="result"></p>
 
     <script>
